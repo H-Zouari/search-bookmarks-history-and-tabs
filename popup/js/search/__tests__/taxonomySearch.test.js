@@ -1,5 +1,60 @@
-import { beforeEach, describe, expect, test } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, test } from '@jest/globals'
 import { clearTestExt, createTestExt } from '../../__tests__/testUtils.js'
+import { buildTagHighlightTerms, searchTaxonomy } from '../taxonomySearch.js'
+
+const bm = (originalId, tagsLower, extra = {}) => ({
+  originalId,
+  title: originalId,
+  url: `https://example.com/${originalId}`,
+  tagsLower,
+  ...extra,
+})
+
+const ids = (results) => results.map((r) => r.originalId).sort()
+
+describe('searchTaxonomy tags: boolean queries', () => {
+  const data = [
+    bm('a', '#dev #frontend'),
+    bm('b', '#dev #backend'),
+    bm('c', '#dev #webdev'),
+    bm('d', '#ops #backend'),
+    bm('e', '#dev #legacy #backend'),
+    bm('f', ''),
+  ]
+
+  test('AND is unchanged (regression)', () => {
+    expect(ids(searchTaxonomy('dev #backend', 'tags', data))).toEqual(['b', 'e'])
+  })
+
+  test('OR-group matches any member', () => {
+    // dev AND (frontend OR webdev)
+    expect(ids(searchTaxonomy('dev #frontend,#webdev', 'tags', data))).toEqual(['a', 'c'])
+  })
+
+  test('negation excludes', () => {
+    // dev AND NOT backend
+    expect(ids(searchTaxonomy('dev -#backend', 'tags', data))).toEqual(['a', 'c'])
+  })
+
+  test('combined OR-group + negation', () => {
+    // dev AND (frontend OR backend) AND NOT legacy
+    expect(ids(searchTaxonomy('dev #frontend,#backend -#legacy', 'tags', data))).toEqual(['a', 'b'])
+  })
+
+  test('marks results with taxonomy approach', () => {
+    const results = searchTaxonomy('dev #frontend', 'tags', data)
+    expect(results[0].searchApproach).toBe('taxonomy')
+  })
+
+  test('empty / no-tag query returns no results', () => {
+    expect(searchTaxonomy('', 'tags', data)).toEqual([])
+  })
+
+  test('content query still narrows by title/url', () => {
+    // dev tag, then double-space content filter on url "/c"
+    expect(ids(searchTaxonomy('dev  /c', 'tags', data))).toEqual(['c'])
+  })
+})
 
 describe('taxonomy search', () => {
   let taxonomyModule
@@ -256,5 +311,94 @@ describe('taxonomy search', () => {
     expect(result.Work).toEqual(['1', '2'])
     expect(result.Personal).toEqual(['3'])
     expect(Object.keys(result)).not.toContain('undefined')
+  })
+})
+
+describe('parseTagQuery', () => {
+  let parseTagQuery
+
+  beforeEach(async () => {
+    const taxonomyModule = await import('../taxonomySearch.js')
+    parseTagQuery = taxonomyModule.parseTagQuery
+  })
+
+  test('single tag (leading # already stripped by caller)', () => {
+    expect(parseTagQuery('dev')).toEqual([[{ tag: 'dev', negated: false }]])
+  })
+
+  test('AND of two tags', () => {
+    expect(parseTagQuery('dev #todo')).toEqual([[{ tag: 'dev', negated: false }], [{ tag: 'todo', negated: false }]])
+  })
+
+  test('OR-group via comma', () => {
+    expect(parseTagQuery('dev #tec,#webdev')).toEqual([
+      [{ tag: 'dev', negated: false }],
+      [
+        { tag: 'tec', negated: false },
+        { tag: 'webdev', negated: false },
+      ],
+    ])
+  })
+
+  test('negation via -#', () => {
+    expect(parseTagQuery('dev -#archived')).toEqual([
+      [{ tag: 'dev', negated: false }],
+      [{ tag: 'archived', negated: true }],
+    ])
+  })
+
+  test('combined OR-group + negation', () => {
+    expect(parseTagQuery('dev #tec,#webdev -#legacy')).toEqual([
+      [{ tag: 'dev', negated: false }],
+      [
+        { tag: 'tec', negated: false },
+        { tag: 'webdev', negated: false },
+      ],
+      [{ tag: 'legacy', negated: true }],
+    ])
+  })
+
+  test('negated member inside an OR-group', () => {
+    expect(parseTagQuery('a,-#b')).toEqual([
+      [
+        { tag: 'a', negated: false },
+        { tag: 'b', negated: true },
+      ],
+    ])
+  })
+
+  test('multi-word tags survive in an OR-group', () => {
+    expect(parseTagQuery('machine learning,#ai')).toEqual([
+      [
+        { tag: 'machine learning', negated: false },
+        { tag: 'ai', negated: false },
+      ],
+    ])
+  })
+
+  test('lowercases tag names', () => {
+    expect(parseTagQuery('Dev #TEC,#WebDev')).toEqual([
+      [{ tag: 'dev', negated: false }],
+      [
+        { tag: 'tec', negated: false },
+        { tag: 'webdev', negated: false },
+      ],
+    ])
+  })
+
+  test('ignores trailing comma / stray markers / empty query', () => {
+    expect(parseTagQuery('dev,')).toEqual([[{ tag: 'dev', negated: false }]])
+    expect(parseTagQuery('')).toEqual([])
+    expect(parseTagQuery('   ')).toEqual([])
+  })
+})
+
+describe('buildTagHighlightTerms', () => {
+  test('expands OR-groups and drops negated tags', () => {
+    expect(buildTagHighlightTerms('dev #tec,#webdev -#legacy')).toBe('#dev #tec #webdev')
+  })
+
+  test('empty query yields empty string', () => {
+    expect(buildTagHighlightTerms('')).toBe('')
   })
 })

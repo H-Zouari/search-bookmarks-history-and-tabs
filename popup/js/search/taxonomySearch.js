@@ -12,6 +12,86 @@
  */
 
 /**
+ * Parse a `#`-tag query into conjunctive-normal-form OR-groups.
+ *
+ * Grammar: space-separated AND-terms; `,` joins tags into an OR-group;
+ * a `-` immediately before a `#` negates that tag. The caller has already
+ * stripped the leading `#`, so we re-prepend it to make every atom uniform.
+ *
+ * @param {string} query - Tag portion of the search term (leading `#` stripped).
+ * @returns {Array<Array<{tag: string, negated: boolean}>>} OR-groups.
+ */
+export function parseTagQuery(query) {
+  const normalized = `#${(query || '').trim()}`
+  const parts = normalized.split('#')
+  const groups = []
+
+  for (let k = 1; k < parts.length; k++) {
+    const prevTrailing = parts[k - 1].match(/[,\s-]*$/)[0]
+    const negated = prevTrailing.includes('-')
+    const orWithPrevious = prevTrailing.includes(',')
+    const tag = parts[k]
+      .replace(/[,\s-]*$/, '')
+      .trim()
+      .toLowerCase()
+    if (!tag) continue
+
+    if (orWithPrevious && groups.length) {
+      groups[groups.length - 1].push({ tag, negated })
+    } else {
+      groups.push([{ tag, negated }])
+    }
+  }
+
+  return groups
+}
+
+/**
+ * True when ANY OR-group member is satisfied for every group (CNF).
+ * A negated atom is satisfied when its tag is absent.
+ *
+ * @param {Array<Array<{tag: string, negated: boolean}>>} groups
+ * @param {string} searchString - Lowercased `#`-joined tag string (`tagsLower`).
+ * @returns {boolean}
+ */
+function matchesTagGroups(groups, searchString) {
+  return groups.every((group) =>
+    group.some((atom) => {
+      const has = searchString.includes(`#${atom.tag}`)
+      return atom.negated ? !has : has
+    }),
+  )
+}
+
+/**
+ * Shared content-filter used by the `  ` (double-space) hybrid search.
+ *
+ * @param {Object} entry - Bookmark-derived entry.
+ * @param {string} contentQuery - Lowercased content filter.
+ * @returns {boolean}
+ */
+function matchesContentQuery(entry, contentQuery) {
+  const title = entry.titleLower || (entry.title || '').toLowerCase()
+  const url = entry.url || ''
+  return title.includes(contentQuery) || url.includes(contentQuery)
+}
+
+/**
+ * Build the highlight term string for tag mode: positive tags only,
+ * space-separated, so the existing space-splitting highlighter marks each badge.
+ *
+ * @param {string} query - Tag portion of the search term (leading `#` stripped).
+ * @returns {string} e.g. `#dev #tec #webdev`
+ */
+export function buildTagHighlightTerms(query) {
+  return parseTagQuery(query)
+    .flat()
+    .filter((atom) => !atom.negated)
+    .map((atom) => `#${atom.tag}`)
+    .join(' ')
+}
+
+/**
  * Simple, precise search for bookmark tags and folder names
  * Executes AND search with the terms in searchTerm, separated by spaces
  *
@@ -40,6 +120,21 @@ export function searchTaxonomy(searchTerm, taxonomyType, data) {
       .toLowerCase()
   }
 
+  if (taxonomyType === 'tags') {
+    const groups = parseTagQuery(taxonomyQuery)
+    if (!groups.length) return results
+    for (const entry of data) {
+      if (!entry) continue
+      if (contentQuery && !matchesContentQuery(entry, contentQuery)) continue
+      const searchString = entry.tagsLower || (entry.tags || '').toLowerCase()
+      if (matchesTagGroups(groups, searchString)) {
+        results.push({ ...entry, searchApproach: 'taxonomy' })
+      }
+    }
+    return results
+  }
+
+  // Folders/groups keep the existing AND-only behavior.
   const searchTerms = taxonomyQuery
     .split(taxonomyMarker)
     .map((term) => term.trim().toLowerCase())
@@ -49,25 +144,12 @@ export function searchTaxonomy(searchTerm, taxonomyType, data) {
     for (const entry of data) {
       if (!entry) continue
 
-      // Content Filter (if active)
-      if (contentQuery) {
-        // Use pre-calculated lowercase values if available
-        const title = entry.titleLower || (entry.title || '').toLowerCase()
-        // entry.url is already normalized and lowercased by cleanUpUrl
-        const url = entry.url || ''
-        // If neither title nor URL (and optional originalUrl) matches, skip
-        if (!title.includes(contentQuery) && !url.includes(contentQuery)) {
-          continue
-        }
-      }
+      if (contentQuery && !matchesContentQuery(entry, contentQuery)) continue
 
-      // Prepare search string for taxonomy matching
       let searchString = ''
       if (taxonomyType === 'group') {
-        // For groups, we prepend @. Use pre-calculated groupLower if available.
         searchString = entry.groupLower ? `@${entry.groupLower}` : entry.group ? `@${entry.group}`.toLowerCase() : ''
       } else {
-        // For tags/folders, use pre-calculated lower field (tagsLower, folderLower)
         searchString = entry[`${taxonomyType}Lower`] || (entry[taxonomyType] || '').toLowerCase()
       }
 

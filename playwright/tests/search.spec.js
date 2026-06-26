@@ -234,4 +234,52 @@ test.describe('Search View', () => {
       await expectNoClientErrors(page)
     })
   })
+
+  test.describe('Boolean Tag Search', () => {
+    test('comma OR-group matches bookmarks with either tag', async ({ page }) => {
+      // #md (ids 22, 23) OR #http (ids 15, 16) -> union of all four, nothing else
+      await page.locator('#q').fill('#md,#http')
+
+      await expect(page.locator('#results li.bookmark')).toHaveCount(4)
+      await expect(page.locator('#results [x-original-id="15"]')).toBeVisible()
+      await expect(page.locator('#results [x-original-id="16"]')).toBeVisible()
+      await expect(page.locator('#results [x-original-id="22"]')).toBeVisible()
+      await expect(page.locator('#results [x-original-id="23"]')).toBeVisible()
+
+      await expectNoClientErrors(page)
+    })
+
+    test('-# excludes bookmarks carrying the negated tag', async ({ page }) => {
+      // #json matches ids 6, 7, 8, 9, 17; -#generator drops id 8 ("JSON Generator")
+      await page.locator('#q').fill('#json -#generator')
+
+      await expect(page.locator('#results li.bookmark')).toHaveCount(4)
+      await expect(page.locator('#results [x-original-id="7"]')).toBeVisible()
+      await expect(page.locator('#results [x-original-id="8"]')).toHaveCount(0)
+
+      await expectNoClientErrors(page)
+    })
+
+    test('combines an OR-group with a negation', async ({ page }) => {
+      // (#json OR #http) AND NOT #generator
+      // #json: 6,7,8,9,17  +  #http: 15,16  =  7, minus #generator (id 8)  =  6
+      await page.locator('#q').fill('#json,#http -#generator')
+
+      await expect(page.locator('#results li.bookmark')).toHaveCount(6)
+      await expect(page.locator('#results [x-original-id="8"]')).toHaveCount(0)
+      await expect(page.locator('#results [x-original-id="15"]')).toBeVisible()
+
+      await expectNoClientErrors(page)
+    })
+
+    test('highlights every positive tag in an OR-group', async ({ page }) => {
+      await page.locator('#q').fill('#md,#http')
+
+      // buildTagHighlightTerms expands the OR-group, so each matched badge is marked
+      await expect(page.locator('#results [x-original-id="22"] .badge.tags mark')).toHaveText('#md')
+      await expect(page.locator('#results [x-original-id="15"] .badge.tags mark')).toHaveText('#http')
+
+      await expectNoClientErrors(page)
+    })
+  })
 })

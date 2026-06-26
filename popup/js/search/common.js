@@ -32,7 +32,7 @@ import { resolveSearchMode } from './queryParser.js'
 import { calculateFinalScore } from './scoring.js'
 import { addSearchEngines, collectCustomSearchAliasResults } from './searchEngines.js'
 import { simpleSearch } from './simpleSearch.js'
-import { searchTaxonomy } from './taxonomySearch.js'
+import { buildTagHighlightTerms, searchTaxonomy } from './taxonomySearch.js'
 
 // Export scoring function for other modules
 export { calculateFinalScore } from './scoring.js'
@@ -359,9 +359,14 @@ export async function search(event) {
       results = filterResults(results, searchMode)
 
       // Apply highlighting only to the truncated result set (better performance)
-      // For taxonomy modes, use the original term to include the marker (#, ~, or @) in highlighting
-      const highlightTerm =
-        searchMode === 'tags' || searchMode === 'folders' || searchMode === 'groups' ? originalSearchTerm : searchTerm
+      // For tag mode, highlight each positive tag (OR-groups expanded, negations dropped).
+      // For folders/groups, keep the original term so the marker (~, @) is highlighted.
+      let highlightTerm = searchTerm
+      if (searchMode === 'tags') {
+        highlightTerm = buildTagHighlightTerms(searchTerm)
+      } else if (searchMode === 'folders' || searchMode === 'groups') {
+        highlightTerm = originalSearchTerm
+      }
       results = highlightResults(results, highlightTerm)
 
       ext.model.result = results
