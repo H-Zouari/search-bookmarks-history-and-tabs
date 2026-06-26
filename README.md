@@ -8,7 +8,7 @@ Available as [Chrome Extension](https://chrome.google.com/webstore/detail/tabs-b
 
 - Open the extension popup and type to search bookmarks, history, and open tabs.
 - Press `Enter` to open the selected result, or right-click a result to copy its URL.
-- Use prefixes to narrow the search: `b ` for bookmarks, `t ` for tabs, `h ` for history and tabs, `#tag`, `~folder`, or `@group`.
+- Use prefixes to narrow the search: `b ` for bookmarks, `t ` for tabs, `h ` for history and tabs, `#tag`, `~folder`, or `@group`. Tag search supports `,` for OR (`#tec,#webdev`) and `-#` to exclude (`-#archived`).
 - Type `g search term` or `d word` to use the default custom search aliases.
 - Click the edit icon on a bookmark result to edit its title, URL, tags, and favorite score.
 

@@ -28,6 +28,8 @@
   - `h `: Only history and tabs.
   - `s `: Only search engines.
 - **AND Filtering**: Combine markers for precise results, e.g., `#work #todo` finds bookmarks with both tags, or `~Projects #design` finds design tags inside the Projects folder.
+- **OR Tags**: Put a comma between `#tags` (each keeps its own `#`) to match _any_ of them, e.g., `#tec,#webdev` finds bookmarks with either tag. Combine with AND: `#dev #tec,#webdev` means `#dev` **and** (`#tec` **or** `#webdev`).
+- **Exclude Tags**: Prefix a tag with `-#` to require its absence, e.g., `#dev -#archived` finds `#dev` bookmarks that are not `#archived`. (OR and exclude apply to `#` tag search only.)
 - **Interactive Badges**: Click on any **Tag** or **Folder** badge in the search results to instantly filter by that item.
 - **Direct Navigation**: Type a domain like `example.com` or `localhost:3000` to jump directly to it.
 - **Quick Aliases**: Use `g <query>` for Google, `d <query>` for dict.cc, or define your own in `customSearchEngines`.

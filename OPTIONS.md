@@ -49,7 +49,7 @@ Control what information is shown in search result items.
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `displayTags` | boolean | `true` | Extract and display `#tags` from bookmark titles as clickable badges. Setting to `false` hides badges but does NOT disable tag search mode (`#`). |
+| `displayTags` | boolean | `true` | Extract and display `#tags` from bookmark titles as clickable badges. Setting to `false` hides badges but does NOT disable tag search mode (`#`). Tag search supports `,` (OR) and `-#` (exclude). |
 | `displayFolderName` | boolean | `true` | Display bookmark folder paths as clickable badges. Setting to `false` hides badges but does NOT disable folder search mode (`~`). |
 | `displayTabGroup` | boolean | `true` | Display tab group names as clickable purple badges. Setting to `false` hides badges but does NOT disable group search mode (`@`). |
 | `displaySearchMatchHighlight` | boolean | `true` | Highlight matching text in results with `<mark>` tags. Disabling slightly improves render performance. |
