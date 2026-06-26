@@ -61,6 +61,7 @@ import { getEffectiveOptions } from './model/optionsStorage.js'
 import { getSearchData } from './model/searchData.js'
 import { calculateFinalScore, executeSearch, sortResults } from './search/common.js'
 import { resetFuzzySearchState } from './search/fuzzySearch.js'
+import { resolveSearchMode } from './search/queryParser.js'
 import { resetSimpleSearchState } from './search/simpleSearch.js'
 import { resetUniqueFoldersCache } from './search/taxonomySearch.js'
 import {
@@ -357,8 +358,15 @@ async function getVisibleBookmarks() {
   let results = bookmarks
 
   if (searchTerm) {
-    results = await executeSearch(searchTerm, 'bookmarks', ext.model, ext.opts)
-    results = sortResults(calculateFinalScore(results, searchTerm), 'score')
+    // Detect `#`-tag queries so the manager shares the popup's boolean tag
+    // search (AND, comma-OR, `-#` negation). Every other query keeps the
+    // existing plain `bookmarks` text search unchanged.
+    const { mode, term } = resolveSearchMode(searchTerm)
+    const isTagQuery = mode === 'tags' && term.trim().length > 0
+    const queryMode = isTagQuery ? 'tags' : 'bookmarks'
+    const queryTerm = isTagQuery ? term.trim() : searchTerm
+    results = await executeSearch(queryTerm, queryMode, ext.model, ext.opts)
+    results = sortResults(calculateFinalScore(results, queryTerm), 'score')
   }
 
   return filterBookmarksByFolder(results, ext.model.bookmarkManager?.folderTree, folderId)

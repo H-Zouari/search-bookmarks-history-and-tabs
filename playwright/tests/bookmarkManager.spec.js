@@ -221,3 +221,41 @@ test.describe('Bookmark Manager - open selected in tabs', () => {
     await expectNoClientErrors(page)
   })
 })
+
+test.describe('Bookmark Manager tag search', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 760 })
+    await page.goto('/bookmarkManager.html')
+    await page.locator('[data-manager-tab="bookmarks"]').click()
+  })
+
+  // #it #architecture,#security,#sap === #it AND (#architecture OR #security OR #sap)
+  // Fixture: "martinfowler.com #it #architecture", "Fefes Blog #it #security",
+  // "deal architect #it #sap" match; "berthub.eu #it" (no OR member) does not.
+  test('AND + comma-OR tag query matches by tag', async ({ page }) => {
+    await page.locator('#bookmark-manager-search').fill('#it #architecture,#security,#sap')
+
+    const rows = page.locator('[data-managed-bookmark-row-id]')
+    await expect(rows).toHaveCount(3)
+
+    const panel = page.locator('[data-manager-panel="bookmarks"]')
+    await expect(panel).toContainText('martinfowler.com')
+    await expect(panel).toContainText('Fefes Blog')
+    await expect(panel).toContainText('deal architect')
+    await expect(panel).not.toContainText('berthub.eu')
+    await expectNoClientErrors(page)
+  })
+
+  // #it -#architecture === #it AND NOT #architecture
+  test('negation excludes a tag', async ({ page }) => {
+    await page.locator('#bookmark-manager-search').fill('#it -#architecture')
+
+    const rows = page.locator('[data-managed-bookmark-row-id]')
+    await expect(rows).toHaveCount(3)
+
+    const panel = page.locator('[data-manager-panel="bookmarks"]')
+    await expect(panel).not.toContainText('martinfowler.com')
+    await expect(panel).toContainText('berthub.eu')
+    await expectNoClientErrors(page)
+  })
+})
