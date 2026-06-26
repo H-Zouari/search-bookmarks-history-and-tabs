@@ -46,6 +46,7 @@ function setupDom() {
     <div id="managed-bookmark-list"></div>
     <button id="select-visible-bookmarks"></button>
     <button id="clear-managed-selection"></button>
+    <button id="open-selected-bookmarks"></button>
     <div id="bookmark-selection-summary"></div>
     <select id="bookmark-move-folder"><option value="folder-1">Folder</option></select>
     <button id="move-selected-bookmarks"></button>
@@ -159,6 +160,7 @@ function bindEvents() {
     onDeleteOne: jest.fn(),
     onBookmarkSearch: jest.fn(),
     onSelectBookmark: setManagedBookmarkSelected,
+    onOpenSelectedInTabs: jest.fn(),
     onSaveBookmark: jest.fn(),
     onMoveSelected: jest.fn(),
     onSuggestTagsSelected: jest.fn(),
@@ -195,6 +197,21 @@ beforeEach(() => {
 })
 
 describe('bookmarkManagerView selection', () => {
+  test('enables Open in tabs only when bookmarks are checked', () => {
+    setupExt()
+    bindEvents()
+    renderBookmarkWorkspace(BOOKMARKS, true, true)
+
+    const button = document.getElementById('open-selected-bookmarks')
+    expect(button.disabled).toBe(true)
+
+    setManagedBookmarkSelected('bookmark-1', true)
+    expect(button.disabled).toBe(false)
+
+    setManagedBookmarkSelected('bookmark-1', false)
+    expect(button.disabled).toBe(true)
+  })
+
   test('temporarily checks the current bookmark until another row is clicked', () => {
     const rows = document.querySelectorAll('[data-managed-bookmark-row-id]')
     const inputs = document.querySelectorAll('[data-managed-bookmark-id]')

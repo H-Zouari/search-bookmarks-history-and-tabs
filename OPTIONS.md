@@ -66,6 +66,7 @@ Control what information is shown in search result items.
 | :--- | :--- | :--- | :--- |
 | `bookmarksIgnoreFolderList` | array | `[]` | List of bookmark folder paths to exclude from search. All bookmarks in these folders (and their subfolders) will be ignored. Example: `['Archive', 'Work/Old Bookmarks']` |
 | `detectDuplicateBookmarks` | boolean | `false` | Detect bookmarks with identical URLs and mark them with a red "D" badge. Useful for cleaning up duplicates. Disable for faster startup with large collections. |
+| `openTabsWarningThreshold` | integer | `30` | Maximum number of checked bookmarks the Bookmark Manager opens in new tabs before showing a confirmation dialog. Raise it if you routinely open large batches; lower it to be warned sooner. |
 
 ## Tabs Options
 

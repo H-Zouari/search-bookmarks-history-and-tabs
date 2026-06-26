@@ -54,6 +54,7 @@ function setupDom() {
     <div id="bookmark-selection-summary"></div>
     <select id="bookmark-move-folder"></select>
     <button id="move-selected-bookmarks"></button>
+    <button id="open-selected-bookmarks"></button>
     <input id="bookmark-bulk-tags" />
     <button id="suggest-tags-selected"></button>
     <div id="tag-suggestion-status"></div>
@@ -168,6 +169,7 @@ describe('initBookmarkManager cleanup apply', () => {
           remove: jest.fn(),
         },
         windows: {},
+        tabs: { create: jest.fn() },
       },
       searchCache: new Map(),
       initialized: false,
@@ -270,5 +272,50 @@ describe('initBookmarkManager cleanup apply', () => {
     expect(globalThis.LanguageModel.availability).not.toHaveBeenCalled()
     expect(globalThis.LanguageModel.create).not.toHaveBeenCalled()
     expect(document.getElementById('tag-suggestion-status').textContent).toContain('Tag suggestion cancelled')
+  })
+
+  test('opens checked bookmarks in background tabs', async () => {
+    ext.model.bookmarkManagerSelectedIds = new Set(['bookmark-1', 'bookmark-2'])
+    // Selecting via the UI would enable the button through updateManagedSelectionUi; mirror that here.
+    document.getElementById('open-selected-bookmarks').disabled = false
+
+    document.getElementById('open-selected-bookmarks').click()
+    await flushPromises()
+
+    expect(ext.browserApi.tabs.create).toHaveBeenCalledTimes(2)
+    expect(ext.browserApi.tabs.create).toHaveBeenNthCalledWith(1, {
+      active: false,
+      url: 'https://example.com/first',
+    })
+    expect(ext.browserApi.tabs.create).toHaveBeenNthCalledWith(2, {
+      active: false,
+      url: 'https://example.com/second',
+    })
+    expect(window.confirm).not.toHaveBeenCalled()
+    expect(document.getElementById('manager-status').textContent).toBe('Opened 2 bookmark(s) in new tabs')
+  })
+
+  test('warns before opening more bookmarks than the threshold and aborts on cancel', async () => {
+    window.confirm = jest.fn(() => false)
+    ext.opts.openTabsWarningThreshold = 1
+    ext.model.bookmarkManagerSelectedIds = new Set(['bookmark-1', 'bookmark-2'])
+    document.getElementById('open-selected-bookmarks').disabled = false
+
+    document.getElementById('open-selected-bookmarks').click()
+    await flushPromises()
+
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Open 2 bookmarks in new tabs?'))
+    expect(ext.browserApi.tabs.create).not.toHaveBeenCalled()
+  })
+
+  test('does nothing when no bookmarks are checked', async () => {
+    ext.model.bookmarkManagerSelectedIds = new Set()
+    // Force-enable so the click reaches the handler and we exercise its empty-selection guard.
+    document.getElementById('open-selected-bookmarks').disabled = false
+
+    document.getElementById('open-selected-bookmarks').click()
+    await flushPromises()
+
+    expect(ext.browserApi.tabs.create).not.toHaveBeenCalled()
   })
 })

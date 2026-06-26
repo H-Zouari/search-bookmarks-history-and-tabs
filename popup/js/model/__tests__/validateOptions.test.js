@@ -62,6 +62,15 @@ describe('validateOptions', () => {
     expect(result.errors).toContain('"searchMaxResults" must be >= 1')
   })
 
+  test('accepts a valid openTabsWarningThreshold and rejects values below 1', async () => {
+    const ok = await validateOptions({ openTabsWarningThreshold: 30 })
+    expect(ok.valid).toBe(true)
+
+    const tooLow = await validateOptions({ openTabsWarningThreshold: 0 })
+    expect(tooLow.valid).toBe(false)
+    expect(tooLow.errors.join(' ')).toContain('openTabsWarningThreshold')
+  })
+
   test('accepts minimum numeric bounds', async () => {
     const result = await validateOptions({
       searchMaxResults: 1,

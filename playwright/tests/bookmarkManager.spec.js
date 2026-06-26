@@ -140,3 +140,84 @@ test.describe('Bookmark Manager', () => {
     await expectNoClientErrors(page)
   })
 })
+
+test.describe('Bookmark Manager - open selected in tabs', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 760 })
+    // Record opened URLs instead of spawning real tabs (preview mode uses the window.open fallback).
+    await page.addInitScript(() => {
+      window.__openedTabs = []
+      window.open = (url) => {
+        window.__openedTabs.push(url)
+        return null
+      }
+    })
+    await page.goto('/bookmarkManager.html#bookmarks')
+  })
+
+  // Note: per-row checkboxes are only interactive when the extension's bookmarks.update API is
+  // present (canUpdateBookmarks). The preview server has no extension API, so these tests drive
+  // selection via "Select Visible" / "Clear" and the search box instead of clicking checkboxes.
+  // Individual-selection logic is covered by the unit + view tests.
+
+  test('toggles Open in tabs as the selection changes', async ({ page }) => {
+    const button = page.locator('#open-selected-bookmarks')
+    await expect(button).toBeDisabled()
+
+    await page.locator('#select-visible-bookmarks').click()
+    await expect(button).toBeEnabled()
+
+    await page.locator('#clear-managed-selection').click()
+    await expect(button).toBeDisabled()
+    await expectNoClientErrors(page)
+  })
+
+  test('opens checked bookmarks without warning when under the threshold', async ({ page }) => {
+    let dialogShown = false
+    page.on('dialog', (dialog) => {
+      dialogShown = true
+      dialog.dismiss().catch(() => {})
+    })
+
+    // Narrow the visible list below the 30-tab threshold, then select what remains.
+    await page.fill('#bookmark-manager-search', 'github')
+    const rows = page.locator('[data-managed-bookmark-id]')
+    await expect.poll(() => rows.count()).toBeGreaterThan(0)
+    await expect.poll(() => rows.count()).toBeLessThan(30)
+    const visibleCount = await rows.count()
+
+    await page.locator('#select-visible-bookmarks').click()
+    await page.locator('#open-selected-bookmarks').click()
+
+    await expect.poll(() => page.evaluate(() => window.__openedTabs.length)).toBe(visibleCount)
+    expect(dialogShown).toBe(false)
+    await expectNoClientErrors(page)
+  })
+
+  test('warns and opens all when accepting the over-threshold dialog', async ({ page }) => {
+    page.once('dialog', (dialog) => {
+      expect(dialog.message()).toContain('Open 35 bookmarks in new tabs?')
+      dialog.accept().catch(() => {})
+    })
+
+    await page.locator('#select-visible-bookmarks').click()
+    await expect(page.locator('#bookmark-selection-summary')).toHaveText('35 selected bookmarks')
+    await page.locator('#open-selected-bookmarks').click()
+
+    await expect.poll(() => page.evaluate(() => window.__openedTabs.length)).toBe(35)
+    await expectNoClientErrors(page)
+  })
+
+  test('opens nothing when dismissing the over-threshold dialog', async ({ page }) => {
+    page.once('dialog', (dialog) => {
+      dialog.dismiss().catch(() => {})
+    })
+
+    await page.locator('#select-visible-bookmarks').click()
+    await page.locator('#open-selected-bookmarks').click()
+
+    // The handler returns synchronously after dismissal; confirm no tabs were opened.
+    await expect.poll(() => page.evaluate(() => window.__openedTabs.length)).toBe(0)
+    await expectNoClientErrors(page)
+  })
+})

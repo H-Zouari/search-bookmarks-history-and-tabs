@@ -199,6 +199,13 @@
       "description": "Detect bookmarks with identical URLs and mark them with a red 'D' badge. Useful for cleaning up duplicates.",
       "x-ui-section": "bookmarks"
     },
+    "openTabsWarningThreshold": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 30,
+      "description": "Maximum number of checked bookmarks the Bookmark Manager opens in new tabs before asking for confirmation. Opening more than this many at once shows a warning dialog first.",
+      "x-ui-section": "bookmarks"
+    },
     "tabsOnlyCurrentWindow": {
       "type": "boolean",
       "default": false,

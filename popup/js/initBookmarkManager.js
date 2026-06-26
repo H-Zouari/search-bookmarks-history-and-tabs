@@ -10,6 +10,12 @@ import {
   LOCAL_AI_TAG_SELECTION_WARNING_LIMIT,
   suggestBookmarkTags,
 } from './helper/localAiTags.js'
+import {
+  collectOpenableBookmarkUrls,
+  createOpenTabsWarning,
+  getOpenTabsWarningThreshold,
+  openUrlsInTabs,
+} from './helper/openBookmarkTabs.js'
 import { cleanUpUrl } from './helper/utils.js'
 import {
   createCleanupApplyEntry,
@@ -67,6 +73,7 @@ import {
   getManagedBookmarkEditValues,
   getManagerTagInputValues,
   getSelectedDuplicateIds,
+  getSelectedManagedBookmarkIds,
   renderActiveManagerScreen,
   renderBookmarkCleanupPrompt,
   renderBookmarkCleanupProposal,
@@ -117,6 +124,7 @@ export async function initBookmarkManager() {
     onDeleteOne: deleteSingleDuplicate,
     onBookmarkSearch: updateBookmarkBrowser,
     onSelectBookmark: setManagedBookmarkSelected,
+    onOpenSelectedInTabs: openSelectedBookmarksInTabs,
     onSaveBookmark: saveManagedBookmark,
     onMoveSelected: moveSelectedBookmarks,
     onSuggestTagsSelected: suggestTagsForSelectedBookmarks,
@@ -392,6 +400,26 @@ async function saveManagedBookmark() {
     showManagerStatus('Save failed', 'error')
     printError(error, 'Could not save bookmark.')
   }
+}
+
+function openSelectedBookmarksInTabs() {
+  const selectedIds = getSelectedManagedBookmarkIds()
+  if (!selectedIds.length) {
+    return
+  }
+
+  const urls = collectOpenableBookmarkUrls(getBookmarksByIds(selectedIds))
+  if (!urls.length) {
+    return
+  }
+
+  const threshold = getOpenTabsWarningThreshold(ext.opts)
+  if (urls.length > threshold && !window.confirm(createOpenTabsWarning(urls.length, threshold))) {
+    return
+  }
+
+  const opened = openUrlsInTabs(urls, ext.browserApi)
+  showManagerStatus(`Opened ${opened} bookmark(s) in new tabs`, 'success')
 }
 
 async function moveSelectedBookmarks() {

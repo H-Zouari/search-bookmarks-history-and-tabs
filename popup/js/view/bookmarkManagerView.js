@@ -55,6 +55,7 @@ export function getBookmarkManagerDom() {
     managedBookmarkList: document.getElementById('managed-bookmark-list'),
     selectVisibleBookmarks: document.getElementById('select-visible-bookmarks'),
     clearManagedSelection: document.getElementById('clear-managed-selection'),
+    openSelectedBookmarks: document.getElementById('open-selected-bookmarks'),
     bookmarkSelectionSummary: document.getElementById('bookmark-selection-summary'),
     bookmarkMoveFolder: document.getElementById('bookmark-move-folder'),
     moveSelectedBookmarks: document.getElementById('move-selected-bookmarks'),
@@ -180,6 +181,7 @@ export function bindBookmarkManagerEvents({
   onDeleteOne,
   onBookmarkSearch,
   onSelectBookmark,
+  onOpenSelectedInTabs,
   onSaveBookmark,
   onMoveSelected,
   onSuggestTagsSelected,
@@ -294,6 +296,7 @@ export function bindBookmarkManagerEvents({
       updateManagedSelectionUi()
     }
   })
+  dom.openSelectedBookmarks.addEventListener('click', onOpenSelectedInTabs)
   dom.saveManagedBookmark.addEventListener('click', onSaveBookmark)
   dom.bookmarkMoveFolder.addEventListener('change', updateManagedSelectionUi)
   dom.bulkTagsInput.addEventListener('change', updateManagedSelectionUi)
@@ -1353,6 +1356,7 @@ function updateManagedSelectionUi() {
   )
   dom.bookmarkSelectionSummary.textContent = renderActionTargetSummary(selectedCount, currentBookmark)
   dom.moveSelectedBookmarks.disabled = !targetIds.length || !canMoveBookmarks || !dom.bookmarkMoveFolder.value
+  dom.openSelectedBookmarks.disabled = selectedCount === 0
   dom.addTagsSelected.disabled = !canApplyBulkTags
   dom.replaceTagsSelected.disabled = !canApplyBulkTags
   dom.removeTagsSelected.disabled = !canApplyBulkTags

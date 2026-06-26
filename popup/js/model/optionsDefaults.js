@@ -99,6 +99,8 @@ export const defaultOptions = {
   bookmarksIgnoreFolderList: [],
   /** Detect and mark duplicate bookmarks (same URL) */
   detectDuplicateBookmarks: false,
+  /** Max checked bookmarks the manager opens in new tabs before showing a warning dialog. */
+  openTabsWarningThreshold: 30,
 
   //////////////////////////////////////////
   // TABS OPTIONS                         //
