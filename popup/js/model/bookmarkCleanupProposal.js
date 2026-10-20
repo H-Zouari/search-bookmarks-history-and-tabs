@@ -2,6 +2,7 @@
  * @file Prompt, schema, and validation helpers for AI bookmark cleanup proposals.
  */
 
+import { getDuplicateUrlKey } from './bookmarkManagerData.js'
 import { normalizeTagName } from './bookmarkManagerOperations.js'
 
 const DEFAULT_PROMPT_BOOKMARK_LIMIT = 1000
@@ -1064,7 +1065,7 @@ function isDuplicateBookmarkPair(bookmarkId, duplicateOfBookmarkId, managerModel
   const urlsByBookmarkId = new Map()
   const bookmarks = managerModel?.bookmarks || []
   for (let i = 0; i < bookmarks.length; i++) {
-    urlsByBookmarkId.set(String(bookmarks[i].originalId), normalizeDuplicateUrl(bookmarks[i]))
+    urlsByBookmarkId.set(String(bookmarks[i].originalId), getDuplicateUrlKey(bookmarks[i]))
   }
 
   const firstUrl = urlsByBookmarkId.get(firstId)
@@ -1156,7 +1157,7 @@ function getDuplicateBookmarkIdGroups(managerModel) {
   const idsByUrl = new Map()
   const bookmarks = managerModel?.bookmarks || []
   for (let i = 0; i < bookmarks.length; i++) {
-    const url = normalizeDuplicateUrl(bookmarks[i])
+    const url = getDuplicateUrlKey(bookmarks[i])
     if (!url) {
       continue
     }
@@ -1191,12 +1192,6 @@ function appendDuplicateBookmarkIdGroup(result, seen, ids) {
 
   seen.add(key)
   result.push(group)
-}
-
-function normalizeDuplicateUrl(bookmark) {
-  return String(bookmark?.url || bookmark?.originalUrl || '')
-    .trim()
-    .toLowerCase()
 }
 
 function countCleanupChangeTypes(changes) {

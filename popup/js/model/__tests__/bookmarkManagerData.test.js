@@ -54,6 +54,41 @@ describe('bookmark manager data', () => {
     expect(duplicateGroups[0].bookmarks[1].duplicateSuggestion.label).toBe('Lower-ranked copy')
   })
 
+  const baseUrls = ['example.com', 'example.com/page', 'docs.example.com/a/b-c', 'localhost:8080/app']
+  const suffixes = [
+    '/',
+    '#section',
+    '/#section',
+    '?utm_source=mail',
+    '/?a=1&b=2',
+    '?a=1#section',
+    '#?not-a-query',
+    '?',
+    '#',
+  ]
+  const suffixedCases = baseUrls.flatMap((base) => suffixes.map((suffix) => [base, `${base}${suffix}`]))
+
+  test.each(suffixedCases)('groups %s with %s', (base, suffixed) => {
+    const duplicateGroups = getDuplicateGroups([
+      { originalId: 'plain', url: base },
+      { originalId: 'suffixed', url: suffixed },
+    ])
+
+    expect(duplicateGroups).toHaveLength(1)
+    expect(duplicateGroups[0].url).toBe(base)
+  })
+
+  const distinctPairs = baseUrls.flatMap((first, i) => baseUrls.slice(i + 1).map((second) => [first, second]))
+
+  test.each(distinctPairs)('keeps %s and %s apart even with the same query and hash', (first, second) => {
+    const duplicateGroups = getDuplicateGroups([
+      { originalId: 'first', url: `${first}?a=1#x` },
+      { originalId: 'second', url: `${second}?a=1#x` },
+    ])
+
+    expect(duplicateGroups).toHaveLength(0)
+  })
+
   test('prefers tags, title quality, recency, then folder depth for duplicate suggestions', () => {
     const tagGroups = getDuplicateGroups([
       {

@@ -5,6 +5,8 @@
 const TOP_LIST_LIMIT = 8
 const UNKNOWN_DOMAIN = 'Unknown'
 const LONG_TITLE_LENGTH = 80
+const DUPLICATE_URL_SUFFIX_REGEX = /[?#].*$/
+const TRAILING_SLASH_REGEX = /\/$/
 
 /**
  * Create the data model consumed by the bookmark manager view.
@@ -75,7 +77,7 @@ export function getDuplicateGroups(bookmarks = []) {
 
   for (let i = 0; i < bookmarks.length; i++) {
     const bookmark = bookmarks[i]
-    const url = bookmark?.url || bookmark?.originalUrl
+    const url = getDuplicateUrlKey(bookmark)
     if (!url) {
       continue
     }
@@ -113,6 +115,14 @@ export function getDuplicateGroups(bookmarks = []) {
   })
 
   return duplicateGroups
+}
+
+export function getDuplicateUrlKey(bookmark) {
+  return String(bookmark?.url || bookmark?.originalUrl || '')
+    .trim()
+    .toLowerCase()
+    .replace(DUPLICATE_URL_SUFFIX_REGEX, '')
+    .replace(TRAILING_SLASH_REGEX, '')
 }
 
 /**
