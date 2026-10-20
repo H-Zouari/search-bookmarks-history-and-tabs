@@ -184,7 +184,7 @@ export async function reloadBookmarkManager(options = {}) {
     const { bookmarks, bookmarkTree } = await getSearchData()
     ext.model.bookmarks = bookmarks
     ext.model.bookmarkTree = bookmarkTree
-    ext.model.bookmarkManager = createBookmarkManagerModel(bookmarks, bookmarkTree)
+    ext.model.bookmarkManager = createBookmarkManagerModel(bookmarks, bookmarkTree, ext.opts.duplicatesIgnoreQueryFor)
     ext.searchCache = new Map()
     ext.model.searchMode = 'bookmarks'
     resetBookmarkSearchCaches()

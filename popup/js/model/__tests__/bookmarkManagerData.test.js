@@ -1,5 +1,13 @@
 import { describe, expect, test } from '@jest/globals'
-import { createBookmarkManagerModel, getDuplicateGroups, getFolderTree, getTagGroups } from '../bookmarkManagerData.js'
+import { cleanUpUrl } from '../../helper/utils.js'
+import {
+  createBookmarkManagerModel,
+  getDuplicateGroups,
+  getFolderTree,
+  getTagGroups,
+  normalizeUrlPrefixes,
+  stripIgnoredUrlQuery,
+} from '../bookmarkManagerData.js'
 
 const bookmarks = [
   {
@@ -52,41 +60,6 @@ describe('bookmark manager data', () => {
     expect(duplicateGroups[0].bookmarks.map((bookmark) => bookmark.originalId)).toEqual(['1', '2'])
     expect(duplicateGroups[0].bookmarks[0].duplicateSuggestion.label).toBe('Best candidate')
     expect(duplicateGroups[0].bookmarks[1].duplicateSuggestion.label).toBe('Lower-ranked copy')
-  })
-
-  const baseUrls = ['example.com', 'example.com/page', 'docs.example.com/a/b-c', 'localhost:8080/app']
-  const suffixes = [
-    '/',
-    '#section',
-    '/#section',
-    '?utm_source=mail',
-    '/?a=1&b=2',
-    '?a=1#section',
-    '#?not-a-query',
-    '?',
-    '#',
-  ]
-  const suffixedCases = baseUrls.flatMap((base) => suffixes.map((suffix) => [base, `${base}${suffix}`]))
-
-  test.each(suffixedCases)('groups %s with %s', (base, suffixed) => {
-    const duplicateGroups = getDuplicateGroups([
-      { originalId: 'plain', url: base },
-      { originalId: 'suffixed', url: suffixed },
-    ])
-
-    expect(duplicateGroups).toHaveLength(1)
-    expect(duplicateGroups[0].url).toBe(base)
-  })
-
-  const distinctPairs = baseUrls.flatMap((first, i) => baseUrls.slice(i + 1).map((second) => [first, second]))
-
-  test.each(distinctPairs)('keeps %s and %s apart even with the same query and hash', (first, second) => {
-    const duplicateGroups = getDuplicateGroups([
-      { originalId: 'first', url: `${first}?a=1#x` },
-      { originalId: 'second', url: `${second}?a=1#x` },
-    ])
-
-    expect(duplicateGroups).toHaveLength(0)
   })
 
   test('prefers tags, title quality, recency, then folder depth for duplicate suggestions', () => {
@@ -184,6 +157,72 @@ describe('bookmark manager data', () => {
     expect(duplicateGroups[0].keepId).toBe('favorite')
     expect(duplicateGroups[0].bookmarks[0].duplicateSuggestion.detail).toContain('+50 favorite score')
     expect(duplicateGroups[0].bookmarks[1].duplicateSuggestion.detail).toContain('lower favorite score')
+  })
+
+  describe('ignoring query strings for chosen URL prefixes', () => {
+    const prefixes = normalizeUrlPrefixes(['www.foo.bar/a/'])
+    const bookmarkAt = (id, originalUrl) => ({ originalId: id, originalUrl, url: cleanUpUrl(originalUrl) })
+
+    test.each([
+      ['https://foo.bar/a/page?ref=1', 'foo.bar/a/page'],
+      ['https://www.foo.bar/a?x=1', 'foo.bar/a'],
+      ['https://foo.bar/a/?x=1', 'foo.bar/a'],
+      ['HTTPS://FOO.BAR/A/Page?X=1', 'foo.bar/a/page'],
+      ['https://foo.bar/a/page?x=1#top', 'foo.bar/a/page'],
+      ['https://foo.bar/abc?x=1', 'foo.bar/abc?x=1'],
+      ['https://foo.bar/?x=1', 'foo.bar/?x=1'],
+      ['https://foo.bar?x=1', 'foo.bar?x=1'],
+      ['https://foo.bar/b/page?x=1', 'foo.bar/b/page?x=1'],
+      ['https://other.bar/a/page?x=1', 'other.bar/a/page?x=1'],
+      ['https://foo.bar/a/page', 'foo.bar/a/page'],
+    ])('%s compares as %s', (originalUrl, expected) => {
+      expect(stripIgnoredUrlQuery(cleanUpUrl(originalUrl), prefixes)).toBe(expected)
+    })
+
+    test.each([
+      ['www.foo.bar/a/'],
+      ['https://foo.bar/a'],
+      ['FOO.BAR/A/'],
+      [' foo.bar/a '],
+    ])('normalizes the prefix %p to foo.bar/a', (prefix) => {
+      expect(normalizeUrlPrefixes([prefix])).toEqual(['foo.bar/a'])
+    })
+
+    test('drops empty prefixes', () => {
+      expect(normalizeUrlPrefixes(['', '  ', null])).toEqual([])
+    })
+
+    test('keeps query strings by default', () => {
+      const duplicateGroups = getDuplicateGroups([
+        bookmarkAt('1', 'https://foo.bar/a/page?x=1'),
+        bookmarkAt('2', 'https://foo.bar/a/page?x=2'),
+      ])
+
+      expect(duplicateGroups).toHaveLength(0)
+    })
+
+    test('groups URLs under a chosen prefix and leaves others apart', () => {
+      const duplicateGroups = getDuplicateGroups(
+        [
+          bookmarkAt('a1', 'https://foo.bar/a/page?x=1'),
+          bookmarkAt('a2', 'https://www.foo.bar/a/page/?x=2'),
+          bookmarkAt('a3', 'https://foo.bar/a/page'),
+          bookmarkAt('b1', 'https://foo.bar/b/page?x=1'),
+          bookmarkAt('b2', 'https://foo.bar/b/page?x=2'),
+        ],
+        prefixes,
+      )
+
+      expect(duplicateGroups).toHaveLength(1)
+      expect(duplicateGroups[0].url).toBe('foo.bar/a/page')
+      expect(duplicateGroups[0].bookmarks.map((bookmark) => bookmark.originalId).sort()).toEqual(['a1', 'a2', 'a3'])
+    })
+
+    test('the manager model carries the normalized prefixes it grouped with', () => {
+      const model = createBookmarkManagerModel([], [], ['www.foo.bar/a/'])
+
+      expect(model.ignoreQueryPrefixes).toEqual(['foo.bar/a'])
+    })
   })
 
   test('calculates overview statistics', () => {

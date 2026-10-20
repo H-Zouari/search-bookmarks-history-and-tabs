@@ -2,7 +2,7 @@
  * @file Prompt, schema, and validation helpers for AI bookmark cleanup proposals.
  */
 
-import { getDuplicateUrlKey } from './bookmarkManagerData.js'
+import { stripIgnoredUrlQuery } from './bookmarkManagerData.js'
 import { normalizeTagName } from './bookmarkManagerOperations.js'
 
 const DEFAULT_PROMPT_BOOKMARK_LIMIT = 1000
@@ -1065,7 +1065,10 @@ function isDuplicateBookmarkPair(bookmarkId, duplicateOfBookmarkId, managerModel
   const urlsByBookmarkId = new Map()
   const bookmarks = managerModel?.bookmarks || []
   for (let i = 0; i < bookmarks.length; i++) {
-    urlsByBookmarkId.set(String(bookmarks[i].originalId), getDuplicateUrlKey(bookmarks[i]))
+    urlsByBookmarkId.set(
+      String(bookmarks[i].originalId),
+      normalizeDuplicateUrl(bookmarks[i], managerModel?.ignoreQueryPrefixes),
+    )
   }
 
   const firstUrl = urlsByBookmarkId.get(firstId)
@@ -1157,7 +1160,7 @@ function getDuplicateBookmarkIdGroups(managerModel) {
   const idsByUrl = new Map()
   const bookmarks = managerModel?.bookmarks || []
   for (let i = 0; i < bookmarks.length; i++) {
-    const url = getDuplicateUrlKey(bookmarks[i])
+    const url = normalizeDuplicateUrl(bookmarks[i], managerModel?.ignoreQueryPrefixes)
     if (!url) {
       continue
     }
@@ -1192,6 +1195,13 @@ function appendDuplicateBookmarkIdGroup(result, seen, ids) {
 
   seen.add(key)
   result.push(group)
+}
+
+function normalizeDuplicateUrl(bookmark, ignoreQueryPrefixes) {
+  const url = String(bookmark?.url || bookmark?.originalUrl || '')
+    .trim()
+    .toLowerCase()
+  return stripIgnoredUrlQuery(url, ignoreQueryPrefixes)
 }
 
 function countCleanupChangeTypes(changes) {

@@ -2,10 +2,13 @@
  * @file Builds aggregate bookmark manager data from normalized bookmark entries.
  */
 
+import { cleanUpUrl } from '../helper/utils.js'
+
 const TOP_LIST_LIMIT = 8
 const UNKNOWN_DOMAIN = 'Unknown'
 const LONG_TITLE_LENGTH = 80
-const DUPLICATE_URL_SUFFIX_REGEX = /[?#].*$/
+// A prefix must end at one of these so `example.com/a` matches `example.com/a/b` but not `example.com/ab`.
+const URL_PREFIX_BOUNDARY_CHARS = '/?'
 const TRAILING_SLASH_REGEX = /\/$/
 
 /**
@@ -13,10 +16,12 @@ const TRAILING_SLASH_REGEX = /\/$/
  *
  * @param {Array<Object>} bookmarks Normalized bookmark entries.
  * @param {Array<Object>} bookmarkTree Raw browser bookmark tree.
- * @returns {{bookmarks: Array<Object>, duplicateGroups: Array<Object>, folderTree: Object, folderOptions: Array<Object>, tagGroups: Array<Object>, stats: Object}}
+ * @param {Array<string>} [ignoreQueryFor=[]] URL prefixes whose query strings are ignored when finding duplicates.
+ * @returns {{bookmarks: Array<Object>, duplicateGroups: Array<Object>, ignoreQueryPrefixes: Array<string>, folderTree: Object, folderOptions: Array<Object>, tagGroups: Array<Object>, stats: Object}}
  */
-export function createBookmarkManagerModel(bookmarks = [], bookmarkTree = []) {
-  const duplicateGroups = getDuplicateGroups(bookmarks)
+export function createBookmarkManagerModel(bookmarks = [], bookmarkTree = [], ignoreQueryFor = []) {
+  const ignoreQueryPrefixes = normalizeUrlPrefixes(ignoreQueryFor)
+  const duplicateGroups = getDuplicateGroups(bookmarks, ignoreQueryPrefixes)
   const tagGroups = getTagGroups(bookmarks)
   const folderTree = getFolderTree(bookmarkTree, bookmarks)
   const folderOptions = getFolderOptions(folderTree)
@@ -25,6 +30,7 @@ export function createBookmarkManagerModel(bookmarks = [], bookmarkTree = []) {
   return {
     bookmarks,
     duplicateGroups,
+    ignoreQueryPrefixes,
     folderTree,
     folderOptions,
     tagGroups,
@@ -70,14 +76,15 @@ export function getFolderOptions(folderTree) {
  * Group bookmarks by normalized URL and keep only groups with duplicates.
  *
  * @param {Array<Object>} bookmarks Normalized bookmark entries.
+ * @param {Array<string>} [ignoreQueryPrefixes=[]] Normalized URL prefixes whose query strings are ignored.
  * @returns {Array<Object>} Duplicate URL groups.
  */
-export function getDuplicateGroups(bookmarks = []) {
+export function getDuplicateGroups(bookmarks = [], ignoreQueryPrefixes = []) {
   const bookmarksByUrl = new Map()
 
   for (let i = 0; i < bookmarks.length; i++) {
     const bookmark = bookmarks[i]
-    const url = getDuplicateUrlKey(bookmark)
+    const url = stripIgnoredUrlQuery(bookmark?.url || bookmark?.originalUrl || '', ignoreQueryPrefixes)
     if (!url) {
       continue
     }
@@ -117,12 +124,28 @@ export function getDuplicateGroups(bookmarks = []) {
   return duplicateGroups
 }
 
-export function getDuplicateUrlKey(bookmark) {
-  return String(bookmark?.url || bookmark?.originalUrl || '')
-    .trim()
-    .toLowerCase()
-    .replace(DUPLICATE_URL_SUFFIX_REGEX, '')
-    .replace(TRAILING_SLASH_REGEX, '')
+export function normalizeUrlPrefixes(prefixes = []) {
+  return prefixes.map((prefix) => cleanUpUrl(String(prefix || '').trim())).filter(Boolean)
+}
+
+export function stripIgnoredUrlQuery(url, ignoreQueryPrefixes = []) {
+  const queryStart = url.indexOf('?')
+  if (queryStart === -1) {
+    return url
+  }
+
+  for (let i = 0; i < ignoreQueryPrefixes.length; i++) {
+    const prefix = ignoreQueryPrefixes[i]
+    if (
+      prefix.length <= queryStart &&
+      url.startsWith(prefix) &&
+      URL_PREFIX_BOUNDARY_CHARS.includes(url.charAt(prefix.length))
+    ) {
+      return url.slice(0, queryStart).replace(TRAILING_SLASH_REGEX, '')
+    }
+  }
+
+  return url
 }
 
 /**

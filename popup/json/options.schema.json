@@ -199,6 +199,16 @@
       "description": "Detect bookmarks with identical URLs and mark them with a red 'D' badge. Useful for cleaning up duplicates.",
       "x-ui-section": "bookmarks"
     },
+    "duplicatesIgnoreQueryFor": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": [],
+      "description": "URL prefixes whose query strings the Bookmark Manager ignores when finding duplicates, such as 'www.example.com/docs/'. A prefix matches whole path segments, so 'example.com/a' covers 'example.com/a/page?x=1' but not 'example.com/ab?x=1'. Every other URL keeps its query string.",
+      "x-ui-section": "bookmarks"
+    },
     "openTabsWarningThreshold": {
       "type": "integer",
       "minimum": 1,
